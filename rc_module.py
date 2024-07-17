@@ -463,6 +463,87 @@ async def merge_audio(status, video_file, local_path, audio_file, subtitle_selec
 # output_path = '/path/to/output.mp4'
 # merge_video_audio_subtitle(video_path, audio_path, output_path)
 
+async def encode(status, local_path, input_file_name, output_file_name, custom_title):
+    """
+    Encode a video file to HEVC x265 720p using ffmpeg.
+
+    Parameters:
+    - input_file (str): The path to the input video file.
+    - output_file (str): The path to the output encoded video file.
+
+    Returns:
+    - str: The path of the encoded video file.
+    """
+    input_file_path = os.path.join(local_path, input_file_name)
+    output_file_path = os.path.join(local_path, output_file_name)
+    file_title = await remove_unwanted(output_file_name)
+
+
+
+    ffmpeg_command = [
+        'ffmpeg',
+        '-i', input_file_path,
+        '-c:v', 'libx265',
+        '-preset', 'medium',
+        '-crf', '22',
+        '-vf', 'scale=-1:720',
+        '-metadata', f'title={file_title}',
+        '-metadata:s:v:0', f'title={custom_title}',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        output_file_path
+    ]
+
+    try:
+        # Run the ffmpeg command and capture the output
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"Encoding completed successfully `{output_file_path}`")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        else:
+           await status.delete()
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+        return None
+
 
 async def upload(status, local_file, remote_path, remote_name='remote', rclone_config_path=None):
     """
