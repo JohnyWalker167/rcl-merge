@@ -277,16 +277,26 @@ async def upload(local_file, remote_path, remote_name='remote', rclone_config_pa
         rclone_config_path,
         'copy',
         local_file,
-        f'{remote_name}:{remote_path}'
+        f'{remote_name}:{remote_path}',
+        '--progress'
     ]
 
     try:
-        # Run the rclone command for uploading
-        subprocess.run(rclone_upload_command, check=True)
-        logger.info("Upload completed successfully.")
+        # Run the rclone command and capture the output
+        process = subprocess.Popen(rclone_upload_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            logger.info(line.strip())
+
+        process.wait()
+
+        if process.returncode == 0:
+            logger.info("Upload completed successfully.")
+        else:
+            logger.error(f"rclone command failed with return code {process.returncode}")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
-
 
 async def remove_unwanted(caption):
     try:
