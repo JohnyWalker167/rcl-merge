@@ -92,13 +92,10 @@ async def merge_command(client, message):
     await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
     audio_select = (await app.listen(message.chat.id)).text
 
-    # Merge videos using ffmpeg and get the merged file path
-    merged_file_path = await merge(merge_local_path, output_filename, custom_title, audio_select)
+    status = await message.reply_text(f"Merging...")
 
-    if merged_file_path:
-        await message.reply_text(f"Video files merged successfully. Merged file path: `{merged_file_path}`")
-    else:
-        await message.reply_text("Error merging video files.")
+    # Merge videos using ffmpeg and get the merged file path
+    await merge(status, merge_local_path, output_filename, custom_title, audio_select)
 
 @app.on_message(filters.command("extract"))
 async def extract_command(client, message):
