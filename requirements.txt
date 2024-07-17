@@ -1,0 +1,6 @@
+pyromod
+pyrogram
+python-dotenv
+asyncio
+tgcrypto
+psutil
