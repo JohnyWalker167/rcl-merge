@@ -1,9 +1,10 @@
 import os
+import asyncio
 from shutil import rmtree
 import time
 from pyrogram import filters, Client
 from pyromod import listen
-from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME
+from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME, cancel_download
 from dotenv import load_dotenv
 from pyrogram.errors import FloodWait
 
@@ -69,9 +70,10 @@ async def download_command(client, message):
     await message.reply_text(f"Enter the local path to save downloaded files (default: `{DEFAULT_LOCAL_PATH}`):")
     local_path = (await app.listen(message.chat.id)).text or DEFAULT_LOCAL_PATH
 
+    status = await message.reply_text("Dwn..")
+
     # Download from rclone cloud
-    await download(remote_path, local_path, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
-    await message.reply_text("Download completed successfully.")
+    status = await download(status, remote_path, local_path, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
 
 
 @app.on_message(filters.command("merge"))
@@ -208,9 +210,10 @@ async def upload_command(client, message):
     await message.reply_text("Enter the remote path to upload to:")
     remote_upload_path = (await app.listen(message.chat.id)).text
 
+    status = await message.reply_text("Uploading...")
+
     # Upload merged video to rclone cloud
-    await upload(local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
-    await message.reply_text("Upload completed successfully.")
+    await upload(status, local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
 
 @app.on_message(filters.command("log"))
 async def log_command(client, message):
@@ -221,6 +224,14 @@ async def log_command(client, message):
         await app.send_document(user_id, document=LOG_FILE_NAME, caption="Bot Log File")
     except Exception as e:
         await app.send_message(user_id, f"Failed to send log file. Error: {str(e)}")
+
+@app.on_message(filters.command("cancel"))
+async def cancel_command(client, message):
+  msg = cancel_download()
+  await message.reply_text(msg)
+
+
+
         
 if __name__ == "__main__":
     
