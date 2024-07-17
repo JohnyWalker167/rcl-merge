@@ -74,13 +74,15 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
                         last_text = text
 
                     await asyncio.sleep(3)
-                
-        process.wait()
+        if process is not None:
+          process.wait()
 
-        if process.returncode == 0:
+          if process.returncode == 0:
             await status.edit_text("Download completed successfully.")
-        else:
+          else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
+        else:
+          await status.delete()
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
 
