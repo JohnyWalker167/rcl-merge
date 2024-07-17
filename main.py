@@ -1,5 +1,4 @@
 import os
-import asyncio
 from shutil import rmtree
 import time
 from pyrogram import filters, Client
@@ -66,14 +65,10 @@ async def download_command(client, message):
     await message.reply_text("Enter the remote path to download from (default: `Work/SSHEMW/Merge`):")
     remote_path = (await app.listen(message.chat.id)).text
 
-    # Ask for the local path to save downloaded files
-    await message.reply_text(f"Enter the local path to save downloaded files (default: `{DEFAULT_LOCAL_PATH}`):")
-    local_path = (await app.listen(message.chat.id)).text or DEFAULT_LOCAL_PATH
-
-    status = await message.reply_text("Dwn..")
+    status = await message.reply_text("Downloading..")
 
     # Download from rclone cloud
-    status = await download(status, remote_path, local_path, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
+    status = await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
 
 
 @app.on_message(filters.command("merge"))
@@ -120,16 +115,17 @@ async def extract_command(client, message):
     await message.reply_text("Enter the stream specifier for codec (e.g., `copy` or `aac` for audio):")
     mode_select = (await app.listen(message.chat.id)).text
 
-    # Extract the specific audio stream
-    extracted_audio_path = await extract(input_file, output_file, audio_stream, stream_select, mode_select)
+    status = message.reply_text("Error extracting audio stream.")
 
-    if extracted_audio_path:
-        await message.reply_text(f"Stream extracted successfully. Extracted audio path: `{extracted_audio_path}`")
-    else:
-        await message.reply_text("Error extracting audio stream.")
+    # Extract the specific audio stream
+    await extract(status, input_file, output_file, audio_stream, stream_select, mode_select)
 
 @app.on_message(filters.command("mergeavs"))
 async def merge_avs_command(client, message):
+    # Ask for the local path containing video files to merge
+    await message.reply_text("Enter the local path containing video files to merge:")
+    merge_local_path = (await app.listen(message.chat.id)).text
+
     # Ask for the local paths of the video, audio, and subtitle files
     await message.reply_text("Enter the local path of the video file:")
     video_path = (await app.listen(message.chat.id)).text
@@ -148,16 +144,10 @@ async def merge_avs_command(client, message):
     await message.reply_text("Enter the custom title for the merged video:")
     custom_title = (await app.listen(message.chat.id)).text
 
-    # Define the output path for the merged file
-    output_path = os.path.join(DEFAULT_LOCAL_PATH, output_filename)
+    status = await message.reply_text("Error merging video, audio, and subtitle.")
 
     # Merge video, audio, and subtitle using the defined function
-    merged_file_path = await merge_avs(video_path, audio_path, subtitle_path, output_path, custom_title)
-
-    if merged_file_path:
-        await message.reply_text(f"Video, audio, and subtitle merged successfully. Merged file path: `{merged_file_path}`")
-    else:
-        await message.reply_text("Error merging video, audio, and subtitle.")
+    await merge_avs(status, video_path, DEFAULT_LOCAL_PATH, audio_path, subtitle_path, output_filename, custom_title)
 
 @app.on_message(filters.command("mergea"))
 async def merge_avs_command(client, message):
@@ -180,18 +170,10 @@ async def merge_avs_command(client, message):
     await message.reply_text("Enter the subtitle title for the merged video: (eg. `0:s:0`)")
     subtitle_select = (await app.listen(message.chat.id)).text
 
-
-    # Define the output path for the merged file
-    output_path = os.path.join(DEFAULT_LOCAL_PATH, output_filename)
+    status = await message.reply_text("Error merging video and audio.")
 
     # Merge video, audio, and subtitle using the defined function
-    merged_file_path = await merge_audio(video_path, audio_path, subtitle_select, output_path, custom_title)
-
-    if merged_file_path:
-        await message.reply_text(f"Video and audio merged successfully. Merged file path: `{merged_file_path}`")
-    else:
-        await message.reply_text("Error merging video and audio.")
-
+    await merge_audio(status, video_path, DEFAULT_LOCAL_PATH, audio_path, subtitle_select, output_filename, custom_title)
 
 @app.on_message(filters.command("upload"))
 async def upload_command(client, message):
@@ -226,10 +208,7 @@ async def log_command(client, message):
 async def cancel_command(client, message):
   msg = cancel_download()
   await message.reply_text(msg)
-
-
-
-        
+       
 if __name__ == "__main__":
     
     try:
