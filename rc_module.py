@@ -113,19 +113,19 @@ async def merge(local_path, output_filename, custom_title, audio_select):
 
     try:
         # Run the ffmpeg command and capture the output
-        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            logger.info(line.strip())
 
-        # Log the command output and error
-        if result.stdout:
-            logger.info(f"ffmpeg stdout: {result.stdout}")
-        if result.stderr:
-            logger.error(f"ffmpeg stderr: {result.stderr}")
+        process.wait()
 
-        if result.returncode == 0:
+        if process.returncode == 0:
             logger.info("Video files merged successfully.")
             return output_file_path
         else:
-            logger.error(f"ffmpeg command failed with return code {result.returncode}")
+            logger.error(f"ffmpeg command failed with return code {process.returncode}")
             return None
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
