@@ -10,7 +10,7 @@ from pyrogram.errors import FloodWait
 load_dotenv()
 
 # Set the default local path
-DEFAULT_LOCAL_PATH = '/usr/src/app/downloads'
+DEFAULT_LOCAL_PATH = '/downloads'
 
 # Set the rclone configuration file path
 RCLONE_CONFIG_PATH = os.environ.get("RCLONE_CONFIG_PATH", "/path/to/rclone.conf")
@@ -78,17 +78,17 @@ async def download_command(client, message):
 async def merge_command(client, message):
     # Ask for the local path containing video files to merge
     await message.reply_text("Enter the local path containing video files to merge:")
-    merge_local_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    merge_local_path = (await app.listen(message.chat.id)).text
 
     # Ask for the name of the merged video file
     await message.reply_text("Enter the name for the merged video file (e.g., merged_video`.mkv`):")
-    output_filename = message.from_user.id, (await app.listen(message.chat.id)).text
+    output_filename = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the title for the merged video file (e.g., `@hevcripsofficial`):")
-    custom_title = message.from_user.id, (await app.listen(message.chat.id)).text
+    custom_title = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
-    audio_select = message.from_user.id, (await app.listen(message.chat.id)).text
+    audio_select = (await app.listen(message.chat.id)).text
 
     # Merge videos using ffmpeg and get the merged file path
     merged_file_path = await merge(merge_local_path, output_filename, custom_title, audio_select)
@@ -102,24 +102,24 @@ async def merge_command(client, message):
 async def extract_command(client, message):
     # Ask for the local path of the video file to extract audio from
     await message.reply_text("Enter the local path of the video file to extract audio from:")
-    input_file = message.from_user.id, (await app.listen(message.chat.id)).text
+    input_file = (await app.listen(message.chat.id)).text
 
     # Ask for the output path of the extracted audio file
     await message.reply_text("Enter the local path to save the extracted audio file:")
-    output_file = message.from_user.id, (await app.listen(message.chat.id)).text
+    output_file = (await app.listen(message.chat.id)).text
 
     # Ask for the audio stream specifier to extract
     await message.reply_text("Enter the audio stream specifier to extract (e.g., `0:a:1`):")
-    audio_stream = message.from_user.id, (await app.listen(message.chat.id)).text
+    audio_stream = (await app.listen(message.chat.id)).text
 
     # Ask for the audio stream specifier to extract
     await message.reply_text("Enter the stream specifier for codec (e.g., `-c:a` for audio):")
-    stream_select = message.from_user.id, (await app.listen(message.chat.id)).text
+    stream_select = (await app.listen(message.chat.id)).text
 
     
     # Ask for the audio stream specifier to extract
     await message.reply_text("Enter the stream specifier for codec (e.g., `copy` or `aac` for audio):")
-    mode_select = message.from_user.id, (await app.listen(message.chat.id)).text
+    mode_select = (await app.listen(message.chat.id)).text
 
     # Extract the specific audio stream
     extracted_audio_path = await extract(input_file, output_file, audio_stream, stream_select, mode_select)
@@ -133,21 +133,21 @@ async def extract_command(client, message):
 async def merge_avs_command(client, message):
     # Ask for the local paths of the video, audio, and subtitle files
     await message.reply_text("Enter the local path of the video file:")
-    video_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    video_path = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the local path of the audio file:")
-    audio_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    audio_path = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the local path of the subtitle file:")
-    subtitle_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    subtitle_path = (await app.listen(message.chat.id)).text
 
     # Ask for the name of the merged output file
     await message.reply_text("Enter the name for the merged output file (e.g., merged_output.mp4):")
-    output_filename = message.from_user.id, (await app.listen(message.chat.id)).text
+    output_filename = (await app.listen(message.chat.id)).text
 
     # Ask for the custom title for the video
     await message.reply_text("Enter the custom title for the merged video:")
-    custom_title = message.from_user.id, (await app.listen(message.chat.id)).text
+    custom_title = (await app.listen(message.chat.id)).text
 
     # Define the output path for the merged file
     output_path = os.path.join(DEFAULT_LOCAL_PATH, output_filename)
@@ -164,22 +164,22 @@ async def merge_avs_command(client, message):
 async def merge_avs_command(client, message):
     # Ask for the local paths of the video, audio, and subtitle files
     await message.reply_text("Enter the local path of the video file:")
-    video_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    video_path = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the local path of the audio file:")
-    audio_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    audio_path = (await app.listen(message.chat.id)).text
 
     # Ask for the name of the merged output file
     await message.reply_text("Enter the name for the merged output file (e.g., merged_output.mp4):")
-    output_filename = message.from_user.id, (await app.listen(message.chat.id)).text
+    output_filename = (await app.listen(message.chat.id)).text
 
     # Ask for the custom title for the video
     await message.reply_text("Enter the custom title for the merged video:")
-    custom_title = message.from_user.id, (await app.listen(message.chat.id)).text
+    custom_title = (await app.listen(message.chat.id)).text
 
     # Ask for the custom title for the video
     await message.reply_text("Enter the subtitle title for the merged video: (eg. `0:s:0`)")
-    subtitle_select = message.from_user.id, (await app.listen(message.chat.id)).text
+    subtitle_select = (await app.listen(message.chat.id)).text
 
 
     # Define the output path for the merged file
@@ -198,15 +198,15 @@ async def merge_avs_command(client, message):
 async def upload_command(client, message):
     # Ask for the local path of the merged video file
     await message.reply_text("Enter the local path of the merged video file:")
-    local_merged_video = message.from_user.id, (await app.listen(message.chat.id)).text
+    local_merged_video = (await app.listen(message.chat.id)).text
 
     # Ask for the rclone remote name for upload
     await message.reply_text("Enter the rclone remote name for upload:")
-    remote_upload_name = message.from_user.id, (await app.listen(message.chat.id)).text
+    remote_upload_name = (await app.listen(message.chat.id)).text
 
     # Ask for the remote path to upload to
     await message.reply_text("Enter the remote path to upload to:")
-    remote_upload_path = message.from_user.id, (await app.listen(message.chat.id)).text
+    remote_upload_path = (await app.listen(message.chat.id)).text
 
     # Upload merged video to rclone cloud
     await upload(local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
