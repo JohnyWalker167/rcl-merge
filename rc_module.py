@@ -85,8 +85,10 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
           await status.delete()
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
+    finally:
+      process = None
 
-async def merge(local_path, output_filename, custom_title, audio_select):
+async def merge(status, local_path, output_filename, custom_title, audio_select):
     """
     Merge video files in a local directory using ffmpeg.
 
@@ -97,6 +99,8 @@ async def merge(local_path, output_filename, custom_title, audio_select):
     Returns:
     - str: The path of the merged video file.
     """
+    global process
+
     # Ensure the local path exists
     if not os.path.exists(local_path):
         logger.error(f"The local path '{local_path}' does not exist.")
@@ -134,28 +138,59 @@ async def merge(local_path, output_filename, custom_title, audio_select):
         output_file_path
     ]
 
+    last_text = None
+
     try:
         # Run the ffmpeg command and capture the output
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         # Log output in real time
         for line in process.stdout:
-            logger.info(line.strip())
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
 
-        process.wait()
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
 
-        if process.returncode == 0:
-            logger.info("Video files merged successfully.")
-            return output_file_path
-        else:
-            logger.error(f"ffmpeg command failed with return code {process.returncode}")
-            return None
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"Merge completed successfully {output_file_path}")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
     finally:
         # Remove the input.txt file after merging
         os.remove(input_txt_path)
+        process = None  # Clear the process reference in the end
         
 async def extract(input_file, output_file, audio_stream, stream_select, mode_select):
     """
@@ -293,6 +328,8 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
     Returns:
     - None
     """
+    global process
+
     # Build the rclone command for uploading
     rclone_upload_command = [
         'rclone',
@@ -324,15 +361,20 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
                 last_text = text
 
                 await asyncio.sleep(3)
-                
-        process.wait()
 
-        if process.returncode == 0:
-          await status.edit_text("Upload completed successfully.")
-        else:
+        if process is not None:
+          process.wait()
+
+          if process.returncode == 0:
+            await status.edit_text("Upload completed successfully.")
+          else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
+        else:
+          await status.delete()
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
+    finally:
+      process = None
 
 async def remove_unwanted(caption):
     try:
@@ -351,3 +393,15 @@ def cancel_download():
         return "Download cancelled."
     else:
         return "No active download to cancel."
+
+def convert_size_to_mb(size_str):
+    """Convert size string (e.g., 63488kB) to MB."""
+    if 'kB' in size_str:
+        size_in_kb = float(size_str.replace('kB', ''))
+        return size_in_kb / 1024
+    elif 'MB' in size_str:
+        return float(size_str.replace('MB', ''))
+    elif 'GB' in size_str:
+        size_in_gb = float(size_str.replace('GB', ''))
+        return size_in_gb * 1024
+    return 0.0
