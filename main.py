@@ -2,6 +2,7 @@ import os
 from shutil import rmtree
 import time
 from pyrogram import filters, Client
+from pyromod import listen
 from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME
 from dotenv import load_dotenv
 from pyrogram.errors import FloodWait
