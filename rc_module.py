@@ -217,7 +217,7 @@ async def extract(status, input_file, output_file, audio_stream, stream_select, 
         f'{stream_select}', f'{mode_select}', # Copy the codec '-c:a' for audio & '-c:v' & '-c:s' for video & subs respectivly
         output_file
     ]
-
+    last_text = None
     try:
         # Run the ffmpeg command and capture the output
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -310,7 +310,7 @@ async def merge_avs(status, video_file, local_path, audio_file, subtitle_file, o
         '-metadata:s:a:0', f'title={custom_title}',
         output_file_path
     ]
-
+    last_text = None
     try:
         # Run the ffmpeg command and capture the output
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -405,7 +405,7 @@ async def merge_audio(status, video_file, local_path, audio_file, subtitle_selec
         '-disposition:a:1', 'default',  
         output_file_path
     ]
-
+    last_text = None
     try:
         # Run the ffmpeg command and capture the output
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -493,7 +493,7 @@ async def encode(status, local_path, input_file_name, output_file_name, custom_t
         '-b:a', '128k',
         output_file_path
     ]
-
+    last_text = None
     try:
         # Run the ffmpeg command and capture the output
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -570,7 +570,7 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
         f'{remote_name}:{remote_path}',
         '--progress'
     ]
-
+    last_text = None
     try:
         # Run the rclone command
         process = subprocess.Popen(rclone_upload_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
