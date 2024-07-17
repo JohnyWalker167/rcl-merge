@@ -1,9 +1,10 @@
 import re
+from re import findall as refindall
 import os
+import asyncio
 import logging
 import subprocess
 from logging.handlers import RotatingFileHandler
-
 
 # Configure the logging module
 LOG_FILE_NAME = "mergebot.txt"
@@ -25,7 +26,7 @@ logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-async def download(remote_path, local_path, remote_name='remote', rclone_config_path=None):
+async def download(status, remote_path, local_path, remote_name='remote', rclone_config_path=None):
     """
     Download files from a cloud path to a local path using rclone.
 
@@ -38,28 +39,48 @@ async def download(remote_path, local_path, remote_name='remote', rclone_config_
     Returns:
     - None
     """
+    global process
+
     # Build the rclone command
-    rclone_command = [
+    rclone_download_command = [
         'rclone',
         '--config',
         rclone_config_path,
         'copy',
         f'{remote_name}:{remote_path}',
-        local_path
+        local_path,
+        '--progress'
     ]
+
+    last_text = None
 
     try:
         # Run the rclone command
-        result = subprocess.run(rclone_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        process = subprocess.Popen(rclone_download_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Log output in real time
+        for line in process.stdout:
+            line = line.strip()
+            datam = refindall("Transferred:.*ETA.*", line)
+            if datam is not None:
+                if len(datam) > 0:
+                    progress = datam[0].replace("Transferred:", "").strip().split(",")
+                    percentage = progress[1].strip("% ")
+                    dwdata = progress[0].strip().split('/')
+                    eta = progress[3].strip().replace('ETA', '').strip()
+                    text = f'**Download**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
 
-        # Log the command output and error
-        if result.stdout:
-            logger.info(f"rclone stdout: {result.stdout}")
-        if result.stderr:
-            logger.error(f"rclone stderr: {result.stderr}")
+                    if text != last_text:
+                        await status.edit_text(text)
+                        last_text = text
 
-        if result.returncode == 0:
-            logger.info("Download completed successfully.")
+                    await asyncio.sleep(3)
+                
+        process.wait()
+
+        if process.returncode == 0:
+            await status.edit_text("Download completed successfully.")
+        else:
+            await status.edit_text(f"rclone command failed with return code {process.returncode}")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
 
@@ -257,7 +278,7 @@ async def merge_audio(video_file, audio_file, subtitle_select, output_file, cust
 # merge_video_audio_subtitle(video_path, audio_path, output_path)
 
 
-async def upload(local_file, remote_path, remote_name='remote', rclone_config_path=None):
+async def upload(status, local_file, remote_path, remote_name='remote', rclone_config_path=None):
     """
     Upload a local file to a specified path on a cloud storage using rclone.
 
@@ -282,19 +303,32 @@ async def upload(local_file, remote_path, remote_name='remote', rclone_config_pa
     ]
 
     try:
-        # Run the rclone command and capture the output
+        # Run the rclone command
         process = subprocess.Popen(rclone_upload_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        
         # Log output in real time
         for line in process.stdout:
-            logger.info(line.strip())
+          line = line.strip()
+          datam = refindall("Transferred:.*ETA.*", line)
+          if datam is not None:
+            if len(datam) > 0:
+              progress = datam[0].replace("Transferred:", "").strip().split(",")
+              percentage= progress[1].strip("% ")
+              dwdata = progress[0].strip().split('/')
+              eta = progress[3].strip().replace('ETA', '').strip()
+              text =f'**Upload**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
 
+              if text != last_text:
+                await status.edit_text(text)
+                last_text = text
+
+                await asyncio.sleep(3)
+                
         process.wait()
 
         if process.returncode == 0:
-            logger.info("Upload completed successfully.")
+          await status.edit_text("Upload completed successfully.")
         else:
-            logger.error(f"rclone command failed with return code {process.returncode}")
+            await status.edit_text(f"rclone command failed with return code {process.returncode}")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
 
@@ -306,3 +340,12 @@ async def remove_unwanted(caption):
     except Exception as e:
         logger.error(e)
         return None
+
+def cancel_download():
+    global process
+    if process is not None:
+        process.terminate()
+        process = None
+        return "Download cancelled."
+    else:
+        return "No active download to cancel."
