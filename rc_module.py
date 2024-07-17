@@ -1,239 +1,407 @@
+import re
+from re import findall as refindall
 import os
 import asyncio
-from shutil import rmtree
-import time
-from pyrogram import filters, Client
-from pyromod import listen
-from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME, cancel_download
-from dotenv import load_dotenv
-from pyrogram.errors import FloodWait
+import logging
+import subprocess
+from logging.handlers import RotatingFileHandler
 
-load_dotenv()
+# Configure the logging module
+LOG_FILE_NAME = "mergebot.txt"
 
-# Set the default local path
-DEFAULT_LOCAL_PATH = '/downloads'
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s - %(levelname)s] - %(name)s - %(message)s",
+    datefmt='%d-%b-%y %H:%M:%S',
+    handlers=[
+        RotatingFileHandler(
+            LOG_FILE_NAME,
+            maxBytes=50000000,
+            backupCount=10
+        ),
+        logging.StreamHandler()
+    ]
+)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
-# Set the rclone configuration file path
-RCLONE_CONFIG_PATH = os.environ.get("RCLONE_CONFIG_PATH", "/path/to/rclone.conf")
+logger = logging.getLogger(__name__)
 
-# Initialize Pyrogram client
-api_id = int(os.environ.get("API_ID", 0))  # Replace 0 with your actual API ID
-api_hash = os.environ.get("API_HASH", "")   # Replace "" with your actual API Hash
-bot_token = os.environ.get("BOT_TOKEN", "")  # Replace "" with your actual Bot Token
+async def download(status, remote_path, local_path, remote_name='remote', rclone_config_path=None):
+    """
+    Download files from a cloud path to a local path using rclone.
 
-app = Client("my_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
+    Parameters:
+    - remote_path (str): The path on the cloud storage.
+    - local_path (str): The local directory where files will be downloaded.
+    - remote_name (str): The name of the rclone remote (default is 'remote').
+    - rclone_config_path (str): The path to the rclone configuration file.
 
+    Returns:
+    - None
+    """
+    global process
 
-async def main():
-    await app.run()
+    # Build the rclone command
+    rclone_download_command = [
+        'rclone',
+        '--config',
+        rclone_config_path,
+        'copy',
+        f'{remote_name}:{remote_path}',
+        local_path,
+        '--progress'
+    ]
 
-async def delete_all(dir):
+    last_text = None
+
     try:
-        rmtree(dir)
-    except Exception as e:
-        logger.error(f"Error clearing files in {DEFAULT_LOCAL_PATH}: {e}")
-        pass
-    return
+        # Run the rclone command
+        process = subprocess.Popen(rclone_download_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Log output in real time
+        for line in process.stdout:
+            line = line.strip()
+            datam = refindall("Transferred:.*ETA.*", line)
+            if datam is not None:
+                if len(datam) > 0:
+                    progress = datam[0].replace("Transferred:", "").strip().split(",")
+                    percentage = progress[1].strip("% ")
+                    dwdata = progress[0].strip().split('/')
+                    eta = progress[3].strip().replace('ETA', '').strip()
+                    text = f'**Download**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
 
-@app.on_message(filters.command("start"))
-async def start_command(client, message):
-    await message.reply_text("Welcome! This bot can perform rclone operations and video merging. Use /help for commands.")
+                    if text != last_text:
+                        await status.edit_text(text)
+                        last_text = text
 
-@app.on_message(filters.command("help"))
-async def help_command(client, message):
-    help_text = (
-        "Available commands:\n"
-        "/download - Download files from rclone cloud storage\n"
-        "/merge - Merge video files\n"
-        "/upload - Upload merged video to rclone cloud storage\n"
-        "/help - Show this help message"
-    )
-    await message.reply_text(help_text)
+                    await asyncio.sleep(3)
+        if process is not None:
+          process.wait()
 
-@app.on_message(filters.command("clear"))
-async def clear_command(client, message):
-    # Clear all files in the DEFAULT_LOCAL_PATH
-    await delete_all(DEFAULT_LOCAL_PATH)
-    await message.reply_text(f"All files in {DEFAULT_LOCAL_PATH} cleared successfully.")
+          if process.returncode == 0:
+            await status.edit_text("Download completed successfully.")
+          else:
+            await status.edit_text(f"rclone command failed with return code {process.returncode}")
+        else:
+          await status.delete()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+    finally:
+      process = None
 
-@app.on_message(filters.command("download"))
-async def download_command(client, message):
-    # Ask for the rclone remote name
-    await message.reply_text("Enter the rclone remote name:")
-    remote_name = (await app.listen(message.chat.id)).text
+async def merge(status, local_path, output_filename, custom_title, audio_select):
+    """
+    Merge video files in a local directory using ffmpeg.
 
-    # Ask for the remote path to download from
-    await message.reply_text("Enter the remote path to download from (default: `Work/SSHEMW/Merge`):")
-    remote_path = (await app.listen(message.chat.id)).text
+    Parameters:
+    - local_path (str): The local directory containing video files.
+    - output_filename (str): The name of the merged output file (default is 'merged_video.mp4').
 
-    # Ask for the local path to save downloaded files
-    await message.reply_text(f"Enter the local path to save downloaded files (default: `{DEFAULT_LOCAL_PATH}`):")
-    local_path = (await app.listen(message.chat.id)).text or DEFAULT_LOCAL_PATH
+    Returns:
+    - str: The path of the merged video file.
+    """
+    global process
 
-    status = await message.reply_text("Dwn..")
+    # Ensure the local path exists
+    if not os.path.exists(local_path):
+        logger.error(f"The local path '{local_path}' does not exist.")
+        return
 
-    # Download from rclone cloud
-    status = await download(status, remote_path, local_path, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
-
-
-@app.on_message(filters.command("merge"))
-async def merge_command(client, message):
-    # Ask for the local path containing video files to merge
-    await message.reply_text("Enter the local path containing video files to merge:")
-    merge_local_path = (await app.listen(message.chat.id)).text
-
-    # Ask for the name of the merged video file
-    await message.reply_text("Enter the name for the merged video file (e.g., merged_video`.mkv`):")
-    output_filename = (await app.listen(message.chat.id)).text
-
-    await message.reply_text("Enter the title for the merged video file (e.g., `@hevcripsofficial`):")
-    custom_title = (await app.listen(message.chat.id)).text
-
-    await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
-    audio_select = (await app.listen(message.chat.id)).text
-
-    status = await message.reply_text(f"Merging...")
-
-    # Merge videos using ffmpeg and get the merged file path
-    await merge(status, merge_local_path, output_filename, custom_title, audio_select)
-
-@app.on_message(filters.command("extract"))
-async def extract_command(client, message):
-    # Ask for the local path of the video file to extract audio from
-    await message.reply_text("Enter the local path of the video file to extract audio from:")
-    input_file = (await app.listen(message.chat.id)).text
-
-    # Ask for the output path of the extracted audio file
-    await message.reply_text("Enter the local path to save the extracted audio file:")
-    output_file = (await app.listen(message.chat.id)).text
-
-    # Ask for the audio stream specifier to extract
-    await message.reply_text("Enter the audio stream specifier to extract (e.g., `0:a:1`):")
-    audio_stream = (await app.listen(message.chat.id)).text
-
-    # Ask for the audio stream specifier to extract
-    await message.reply_text("Enter the stream specifier for codec (e.g., `-c:a` for audio):")
-    stream_select = (await app.listen(message.chat.id)).text
-
+    # Get a list of video files in the local directory
+    video_files = [f for f in os.listdir(local_path) if f.lower().endswith(('.mp4', '.mkv', '.avi', '.mov'))]
     
-    # Ask for the audio stream specifier to extract
-    await message.reply_text("Enter the stream specifier for codec (e.g., `copy` or `aac` for audio):")
-    mode_select = (await app.listen(message.chat.id)).text
+    if not video_files:
+        logger.error("No video files found in the specified local path.")
+        return
+    video_files.sort()
 
-    # Extract the specific audio stream
-    extracted_audio_path = await extract(input_file, output_file, audio_stream, stream_select, mode_select)
-
-    if extracted_audio_path:
-        await message.reply_text(f"Stream extracted successfully. Extracted audio path: `{extracted_audio_path}`")
-    else:
-        await message.reply_text("Error extracting audio stream.")
-
-@app.on_message(filters.command("mergeavs"))
-async def merge_avs_command(client, message):
-    # Ask for the local paths of the video, audio, and subtitle files
-    await message.reply_text("Enter the local path of the video file:")
-    video_path = (await app.listen(message.chat.id)).text
-
-    await message.reply_text("Enter the local path of the audio file:")
-    audio_path = (await app.listen(message.chat.id)).text
-
-    await message.reply_text("Enter the local path of the subtitle file:")
-    subtitle_path = (await app.listen(message.chat.id)).text
-
-    # Ask for the name of the merged output file
-    await message.reply_text("Enter the name for the merged output file (e.g., merged_output.mp4):")
-    output_filename = (await app.listen(message.chat.id)).text
-
-    # Ask for the custom title for the video
-    await message.reply_text("Enter the custom title for the merged video:")
-    custom_title = (await app.listen(message.chat.id)).text
-
-    # Define the output path for the merged file
-    output_path = os.path.join(DEFAULT_LOCAL_PATH, output_filename)
-
-    # Merge video, audio, and subtitle using the defined function
-    merged_file_path = await merge_avs(video_path, audio_path, subtitle_path, output_path, custom_title)
-
-    if merged_file_path:
-        await message.reply_text(f"Video, audio, and subtitle merged successfully. Merged file path: `{merged_file_path}`")
-    else:
-        await message.reply_text("Error merging video, audio, and subtitle.")
-
-@app.on_message(filters.command("mergea"))
-async def merge_avs_command(client, message):
-    # Ask for the local paths of the video, audio, and subtitle files
-    await message.reply_text("Enter the local path of the video file:")
-    video_path = (await app.listen(message.chat.id)).text
-
-    await message.reply_text("Enter the local path of the audio file:")
-    audio_path = (await app.listen(message.chat.id)).text
-
-    # Ask for the name of the merged output file
-    await message.reply_text("Enter the name for the merged output file (e.g., merged_output.mp4):")
-    output_filename = (await app.listen(message.chat.id)).text
-
-    # Ask for the custom title for the video
-    await message.reply_text("Enter the custom title for the merged video:")
-    custom_title = (await app.listen(message.chat.id)).text
-
-    # Ask for the custom title for the video
-    await message.reply_text("Enter the subtitle title for the merged video: (eg. `0:s:0`)")
-    subtitle_select = (await app.listen(message.chat.id)).text
+    # Create the input.txt file
+    input_txt_path = os.path.join(local_path, 'input.txt')
+    with open(input_txt_path, 'w') as input_txt:
+        input_txt.writelines([f"file '{os.path.join(local_path, file)}'\n" for file in video_files])
 
 
-    # Define the output path for the merged file
-    output_path = os.path.join(DEFAULT_LOCAL_PATH, output_filename)
+    # Build the ffmpeg command
+    output_file_path = os.path.join(local_path, output_filename)
+    file_title = await remove_unwanted(output_filename)
+    ffmpeg_command = [
+        'ffmpeg',
+        '-loglevel','error','-stats',
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', input_txt_path,
+        '-metadata', f'title={file_title}',
+        '-metadata:s:v:0', f'title={custom_title}',
+        '-c', 'copy',
+        '-map', '0:v',  # Copy video stream
+        '-map', f'{audio_select}',
+        '-map', '0:s',
+        output_file_path
+    ]
 
-    # Merge video, audio, and subtitle using the defined function
-    merged_file_path = await merge_audio(video_path, audio_path, subtitle_select, output_path, custom_title)
+    last_text = None
 
-    if merged_file_path:
-        await message.reply_text(f"Video and audio merged successfully. Merged file path: `{merged_file_path}`")
-    else:
-        await message.reply_text("Error merging video and audio.")
-
-
-@app.on_message(filters.command("upload"))
-async def upload_command(client, message):
-    # Ask for the local path of the merged video file
-    await message.reply_text("Enter the local path of the merged video file:")
-    local_merged_video = (await app.listen(message.chat.id)).text
-
-    # Ask for the rclone remote name for upload
-    await message.reply_text("Enter the rclone remote name for upload:")
-    remote_upload_name = (await app.listen(message.chat.id)).text
-
-    # Ask for the remote path to upload to
-    await message.reply_text("Enter the remote path to upload to:")
-    remote_upload_path = (await app.listen(message.chat.id)).text
-
-    status = await message.reply_text("Uploading...")
-
-    # Upload merged video to rclone cloud
-    await upload(status, local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
-
-@app.on_message(filters.command("log"))
-async def log_command(client, message):
-    user_id = message.from_user.id
-
-    # Send the log file
     try:
-        await app.send_document(user_id, document=LOG_FILE_NAME, caption="Bot Log File")
-    except Exception as e:
-        await app.send_message(user_id, f"Failed to send log file. Error: {str(e)}")
-
-@app.on_message(filters.command("cancel"))
-async def cancel_command(client, message):
-  msg = cancel_download()
-  await message.reply_text(msg)
+        # Run the ffmpeg command and capture the output
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
-if __name__ == "__main__":
-    
+        # Log output in real time
+        for line in process.stdout:
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"Merge completed successfully {output_file_path}")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+        return None
+    finally:
+        # Remove the input.txt file after merging
+        os.remove(input_txt_path)
+        process = None  # Clear the process reference in the end
+        
+async def extract(input_file, output_file, audio_stream, stream_select, mode_select):
+    """
+    Extract a specific audio stream from a video file.
+
+    Parameters:
+    - input_file (str): The path to the input video file.
+    - output_file (str): The path to the output audio file.
+    - audio_stream (str): Stream specifier for the audio stream to extract.
+
+    Returns:
+    - str: The path of the extracted audio file.
+    """
+    ffmpeg_command = [
+        'ffmpeg',
+        '-loglevel', 'error',
+        '-i', input_file,
+        '-map', audio_stream,
+        f'{stream_select}', f'{mode_select}', # Copy the codec '-c:a' for audio & '-c:v' & '-c:s' for video & subs respectivly
+        output_file
+    ]
+
     try:
-        app.run()
-    except FloodWait as e:
-        # Handle FloodWait exception
-        logger.error(f"FloodWait exception. Waiting for {e.value} seconds.")
-        time.sleep(e.value)
-        # Retry running the app after waiting
-        app.run()
+        subprocess.run(ffmpeg_command, check=True)
+        logger.info("Stream extracted successfully.")
+        return output_file
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+        return None
+
+# Example usage:
+# input_file = '/path/to/input_video.mp4'
+# output_file = '/path/to/output_audio.mp3'
+# audio_stream = 'a:0'  # Change this to the desired audio stream specifier
+# extract_audio_stream(input_file, output_file, audio_stream)
+
+async def merge_avs(video_file, audio_file, subtitle_file, output_file, custom_title):
+    """
+    Merge video, audio, and subtitle files into a single output file using ffmpeg.
+
+    Parameters:
+    - video_file (str): Path to the input video file.
+    - audio_file (str): Path to the input audio file.
+    - subtitle_file (str): Path to the input subtitle file.
+    - output_file (str): Path to the output merged file.
+
+    Returns:
+    - str: The path of the merged file.
+    """
+    ffmpeg_command = [
+        'ffmpeg',
+        '-loglevel', 'error',
+        '-i', video_file,
+        '-i', audio_file,
+        '-i', subtitle_file,
+        '-c:v', 'copy',  # Copy video codec
+        '-c:a', 'copy',  # Copy audio codec
+        '-map', '0:v:0',  # Map video stream from the first input
+        '-map', '1:a:0',  # Map audio stream from the second input
+        '-map', '2:s:0',  # Map subtitle stream from the third input
+        '-metadata', f'title={custom_title}',  # Set custom title
+        output_file
+    ]
+
+    try:
+        subprocess.run(ffmpeg_command, check=True)
+        logger.info("Video, audio, and subtitle merged successfully.")
+        return output_file
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+        return None
+
+# Example usage:
+# video_path = '/path/to/video.mp4'
+# audio_path = '/path/to/audio.mp3'
+# subtitle_path = '/path/to/subtitle.srt'
+# output_path = '/path/to/output.mp4'
+# merge_video_audio_subtitle(video_path, audio_path, subtitle_path, output_path)
+
+async def merge_audio(video_file, audio_file, subtitle_select, output_file, custom_title):
+    """
+    Merge video, audio, and subtitle files into a single output file using ffmpeg.
+
+    Parameters:
+    - video_file (str): Path to the input video file.
+    - audio_file (str): Path to the input audio file.
+    - output_file (str): Path to the output merged file.
+
+    Returns:
+    - str: The path of the merged file.
+    """
+    ffmpeg_command = [
+        'ffmpeg',
+        '-loglevel', 'error',
+        '-i', video_file,
+        '-i', audio_file,
+        '-c:v', 'copy',  # Copy video codec
+        '-c:a', 'copy',  # Copy audio codec
+        '-map', '0:v:0',  # Map video stream from the first input
+        '-map', '0:a:0',  # Map audio stream from the first input
+        '-map', '1:a:0',  # Map audio stream from the second input
+        '-map', f'{subtitle_select}',  # Map subtitle stream from the third input
+        '-metadata', f'title={custom_title}',  # Set custom title
+        '-metadata:s:a:1', 'language=hin',  # Set language metadata for the second input audio stream
+        '-disposition:a:0', 'none',  # Set the first input audio stream as not default
+        '-disposition:a:1', 'default',  
+        output_file
+    ]
+
+    try:
+        subprocess.run(ffmpeg_command, check=True)
+        logger.info("Video, audio merged successfully.")
+        return output_file
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+        return None
+
+# Example usage:
+# video_path = '/path/to/video.mp4'
+# audio_path = '/path/to/audio.mp3'
+# output_path = '/path/to/output.mp4'
+# merge_video_audio_subtitle(video_path, audio_path, output_path)
+
+
+async def upload(status, local_file, remote_path, remote_name='remote', rclone_config_path=None):
+    """
+    Upload a local file to a specified path on a cloud storage using rclone.
+
+    Parameters:
+    - local_file (str): The local file to upload.
+    - remote_path (str): The path on the cloud storage.
+    - remote_name (str): The name of the rclone remote (default is 'remote').
+    - rclone_config_path (str): The path to the rclone configuration file.
+
+    Returns:
+    - None
+    """
+    global process
+
+    # Build the rclone command for uploading
+    rclone_upload_command = [
+        'rclone',
+        '--config',
+        rclone_config_path,
+        'copy',
+        local_file,
+        f'{remote_name}:{remote_path}',
+        '--progress'
+    ]
+
+    try:
+        # Run the rclone command
+        process = subprocess.Popen(rclone_upload_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Log output in real time
+        for line in process.stdout:
+          line = line.strip()
+          datam = refindall("Transferred:.*ETA.*", line)
+          if datam is not None:
+            if len(datam) > 0:
+              progress = datam[0].replace("Transferred:", "").strip().split(",")
+              percentage= progress[1].strip("% ")
+              dwdata = progress[0].strip().split('/')
+              eta = progress[3].strip().replace('ETA', '').strip()
+              text =f'**Upload**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
+
+              if text != last_text:
+                await status.edit_text(text)
+                last_text = text
+
+                await asyncio.sleep(3)
+
+        if process is not None:
+          process.wait()
+
+          if process.returncode == 0:
+            await status.edit_text("Upload completed successfully.")
+          else:
+            await status.edit_text(f"rclone command failed with return code {process.returncode}")
+        else:
+          await status.delete()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error: {e}")
+    finally:
+      process = None
+
+async def remove_unwanted(caption):
+    try:
+        # Remove .mkv and .mp4 extensions if present
+        cleaned_caption = re.sub(r'\.mkv|\.mp4|\.webm', '', caption)
+        return cleaned_caption
+    except Exception as e:
+        logger.error(e)
+        return None
+
+def cancel_download():
+    global process
+    if process is not None:
+        process.terminate()
+        process = None
+        return "Download cancelled."
+    else:
+        return "No active download to cancel."
+
+def convert_size_to_mb(size_str):
+    """Convert size string (e.g., 63488kB) to MB."""
+    if 'kB' in size_str:
+        size_in_kb = float(size_str.replace('kB', ''))
+        return size_in_kb / 1024
+    elif 'MB' in size_str:
+        return float(size_str.replace('MB', ''))
+    elif 'GB' in size_str:
+        size_in_gb = float(size_str.replace('GB', ''))
+        return size_in_gb * 1024
+    return 0.0
