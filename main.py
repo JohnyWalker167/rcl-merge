@@ -3,7 +3,7 @@ from shutil import rmtree
 import time
 from pyrogram import filters, Client
 from pyromod import listen
-from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME, cancel_download
+from rc_module import download, merge, extract, merge_avs, merge_audio, upload, logger, LOG_FILE_NAME, cancel_download, encode
 from dotenv import load_dotenv
 from pyrogram.errors import FloodWait
 
@@ -170,10 +170,28 @@ async def merge_avs_command(client, message):
     await message.reply_text("Enter the subtitle title for the merged video: (eg. `0:s:0`)")
     subtitle_select = (await app.listen(message.chat.id)).text
 
-    status = await message.reply_text("Error merging video and audio.")
+    status = await message.reply_text("Merging")
 
     # Merge video, audio, and subtitle using the defined function
     await merge_audio(status, video_path, DEFAULT_LOCAL_PATH, audio_path, subtitle_select, output_filename, custom_title)
+
+@app.on_message(filters.command("encode"))
+async def encode_command(client, message):
+    # Ask for the file_name of video
+    await message.reply_text("Enter the file_name of the video (e.g., encode.mp4)")
+    input_file_name = (await app.listen(message.chat.id)).text
+
+    # Ask for the custom file_name for the encode output
+    await message.reply_text("Enter the file_name of the video (e.g., merged_output.mp4)")
+    output_file_name = (await app.listen(message.chat.id)).text
+
+    # Ask for the custom title for the video
+    await message.reply_text("Enter the custom title for the encoded video:")
+    custom_title = (await app.listen(message.chat.id)).text
+
+    status = await message.reply_text("Encoding...") 
+
+    await encode(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title)
 
 @app.on_message(filters.command("upload"))
 async def upload_command(client, message):
