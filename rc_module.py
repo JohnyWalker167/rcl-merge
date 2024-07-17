@@ -131,6 +131,7 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
         '-i', input_txt_path,
         '-metadata', f'title={file_title}',
         '-metadata:s:v:0', f'title={custom_title}',
+        '-metadata:s:a:0', f'title={custom_title}',
         '-c', 'copy',
         '-map', '0:v',  # Copy video stream
         '-map', f'{audio_select}',
@@ -180,9 +181,11 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
             process.wait()
 
             if process.returncode == 0:
-              await status.edit_text(f"Merge completed successfully {output_file_path}")
+              await status.edit_text(f"Merge completed successfully `{output_file_path}`")
             else:
               await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        else:
+           await status.delete
         
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
@@ -192,7 +195,7 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
         os.remove(input_txt_path)
         process = None  # Clear the process reference in the end
         
-async def extract(input_file, output_file, audio_stream, stream_select, mode_select):
+async def extract(status, input_file, output_file, audio_stream, stream_select, mode_select):
     """
     Extract a specific audio stream from a video file.
 
@@ -204,6 +207,8 @@ async def extract(input_file, output_file, audio_stream, stream_select, mode_sel
     Returns:
     - str: The path of the extracted audio file.
     """
+    global process
+
     ffmpeg_command = [
         'ffmpeg',
         '-loglevel', 'error',
@@ -214,12 +219,56 @@ async def extract(input_file, output_file, audio_stream, stream_select, mode_sel
     ]
 
     try:
-        subprocess.run(ffmpeg_command, check=True)
-        logger.info("Stream extracted successfully.")
-        return output_file
+        # Run the ffmpeg command and capture the output
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"extract completed successfully `{output_file}`")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        else:
+           await status.delete()
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
+    finally:
+       process = None
 
 # Example usage:
 # input_file = '/path/to/input_video.mp4'
@@ -227,7 +276,7 @@ async def extract(input_file, output_file, audio_stream, stream_select, mode_sel
 # audio_stream = 'a:0'  # Change this to the desired audio stream specifier
 # extract_audio_stream(input_file, output_file, audio_stream)
 
-async def merge_avs(video_file, audio_file, subtitle_file, output_file, custom_title):
+async def merge_avs(status, video_file, local_path, audio_file, subtitle_file, output_filename, custom_title):
     """
     Merge video, audio, and subtitle files into a single output file using ffmpeg.
 
@@ -240,6 +289,11 @@ async def merge_avs(video_file, audio_file, subtitle_file, output_file, custom_t
     Returns:
     - str: The path of the merged file.
     """
+    global process
+
+    output_file_path = os.path.join(local_path, output_filename)
+    file_title = await remove_unwanted(output_filename)
+
     ffmpeg_command = [
         'ffmpeg',
         '-loglevel', 'error',
@@ -251,17 +305,63 @@ async def merge_avs(video_file, audio_file, subtitle_file, output_file, custom_t
         '-map', '0:v:0',  # Map video stream from the first input
         '-map', '1:a:0',  # Map audio stream from the second input
         '-map', '2:s:0',  # Map subtitle stream from the third input
-        '-metadata', f'title={custom_title}',  # Set custom title
-        output_file
+        '-metadata', f'title={file_title}',
+        '-metadata:s:v:0', f'title={custom_title}',
+        '-metadata:s:a:0', f'title={custom_title}',
+        output_file_path
     ]
 
     try:
-        subprocess.run(ffmpeg_command, check=True)
-        logger.info("Video, audio, and subtitle merged successfully.")
-        return output_file
+        # Run the ffmpeg command and capture the output
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"Video, audio, and subtitle merged successfully `{output_file_path}`")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        else:
+           await status.delete()
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
+    finally:
+       process = None
 
 # Example usage:
 # video_path = '/path/to/video.mp4'
@@ -270,7 +370,7 @@ async def merge_avs(video_file, audio_file, subtitle_file, output_file, custom_t
 # output_path = '/path/to/output.mp4'
 # merge_video_audio_subtitle(video_path, audio_path, subtitle_path, output_path)
 
-async def merge_audio(video_file, audio_file, subtitle_select, output_file, custom_title):
+async def merge_audio(status, video_file, local_path, audio_file, subtitle_select, output_filename, custom_title):
     """
     Merge video, audio, and subtitle files into a single output file using ffmpeg.
 
@@ -282,6 +382,11 @@ async def merge_audio(video_file, audio_file, subtitle_select, output_file, cust
     Returns:
     - str: The path of the merged file.
     """
+    global process
+
+    output_file_path = os.path.join(local_path, output_filename)
+    file_title = await remove_unwanted(output_filename)
+
     ffmpeg_command = [
         'ffmpeg',
         '-loglevel', 'error',
@@ -293,20 +398,64 @@ async def merge_audio(video_file, audio_file, subtitle_select, output_file, cust
         '-map', '0:a:0',  # Map audio stream from the first input
         '-map', '1:a:0',  # Map audio stream from the second input
         '-map', f'{subtitle_select}',  # Map subtitle stream from the third input
-        '-metadata', f'title={custom_title}',  # Set custom title
+        '-metadata', f'title={file_title}',
+        '-metadata:s:a:0', f'title={custom_title}',
         '-metadata:s:a:1', 'language=hin',  # Set language metadata for the second input audio stream
         '-disposition:a:0', 'none',  # Set the first input audio stream as not default
         '-disposition:a:1', 'default',  
-        output_file
+        output_file_path
     ]
 
     try:
-        subprocess.run(ffmpeg_command, check=True)
-        logger.info("Video, audio merged successfully.")
-        return output_file
+        # Run the ffmpeg command and capture the output
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        
+        # Log output in real time
+        for line in process.stdout:
+            if process is None: # Check if the process has been cancelled
+              break
+            line = line.strip()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            if frame_match and fps_match and size_match and time_match and bitrate_match and speed_match:
+                frame = int(frame_match.group(1))
+                fps = float(fps_match.group(1))
+                size = convert_size_to_mb(size_match.group(1))
+                time_str = time_match.group(1)
+                bitrate = bitrate_match.group(1)
+                speed_str = speed_match.group(1)
+
+                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                        f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
+
+                if text != last_text:
+                    await status.edit_text(text)
+                    last_text = text
+
+                await asyncio.sleep(3)
+
+
+        if process is not None:  # Ensure process is still running before waiting
+            process.wait()
+
+            if process.returncode == 0:
+              await status.edit_text(f"Video, audio merged successfully `{output_file_path}`")
+            else:
+              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+        else:
+           await status.delete()
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
+    finally:
+       process = None
 
 # Example usage:
 # video_path = '/path/to/video.mp4'
