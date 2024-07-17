@@ -1,5 +1,5 @@
 pyromod
-pyrogram
+pyrofork==2.2.10
 python-dotenv
 asyncio
 tgcrypto
