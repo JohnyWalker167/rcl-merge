@@ -50,8 +50,16 @@ async def download(remote_path, local_path, remote_name='remote', rclone_config_
 
     try:
         # Run the rclone command
-        subprocess.run(rclone_command, check=True)
-        logger.info("Download completed successfully.")
+        result = subprocess.run(rclone_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        # Log the command output and error
+        if result.stdout:
+            logger.info(f"rclone stdout: {result.stdout}")
+        if result.stderr:
+            logger.error(f"rclone stderr: {result.stderr}")
+
+        if result.returncode == 0:
+            logger.info("Download completed successfully.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
 
