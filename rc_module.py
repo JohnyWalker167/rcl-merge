@@ -104,17 +104,28 @@ async def merge(local_path, output_filename, custom_title, audio_select):
     ]
 
     try:
-        # Run the ffmpeg command
-        subprocess.run(ffmpeg_command, check=True)
-        logger.info("Video files merged successfully.")
-        return output_file_path
+        # Run the ffmpeg command and capture the output
+        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Log the command output and error
+        if result.stdout:
+            logger.info(f"ffmpeg stdout: {result.stdout}")
+        if result.stderr:
+            logger.error(f"ffmpeg stderr: {result.stderr}")
+
+        if result.returncode == 0:
+            logger.info("Video files merged successfully.")
+            return output_file_path
+        else:
+            logger.error(f"ffmpeg command failed with return code {result.returncode}")
+            return None
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
     finally:
         # Remove the input.txt file after merging
-        os.remove(input_txt_path) 
-
+        os.remove(input_txt_path)
+        
 async def extract(input_file, output_file, audio_stream, stream_select, mode_select):
     """
     Extract a specific audio stream from a video file.
