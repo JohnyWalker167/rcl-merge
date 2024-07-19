@@ -70,8 +70,6 @@ async def download_command(client, message):
     # Download from rclone cloud
     status = await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
 
-    await app.send_message("Download Completed")
-
 @app.on_message(filters.command("merge"))
 async def merge_command(client, message):
     # Ask for the local path containing video files to merge
@@ -92,8 +90,6 @@ async def merge_command(client, message):
 
     # Merge videos using ffmpeg and get the merged file path
     await merge(status, merge_local_path, output_filename, custom_title, audio_select)
-
-    await app.send_message("Merge Completed")
 
 @app.on_message(filters.command("changeindex"))
 async def changeindex_command(client, message):
@@ -117,7 +113,6 @@ async def changeindex_command(client, message):
 
     await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, sub_select)
 
-    await app.send_message("ChangeIndex Completed")
 
 @app.on_message(filters.command("encode"))
 async def encode_command(client, message):
@@ -137,8 +132,6 @@ async def encode_command(client, message):
 
     await encode(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title)
 
-    await app.send_message("Encode Completed")
-
 @app.on_message(filters.command("upload"))
 async def upload_command(client, message):
     # Ask for the local path of the merged video file
@@ -157,8 +150,6 @@ async def upload_command(client, message):
 
     # Upload merged video to rclone cloud
     await upload(status, local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
-
-    await app.send_message("Upload Completed")
 
 @app.on_message(filters.command("log"))
 async def log_command(client, message):
