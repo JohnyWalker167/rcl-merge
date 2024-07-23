@@ -66,13 +66,13 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
                     progress = datam[0].replace("Transferred:", "").strip().split(",")
                     dwdata = progress[0].strip().split('/')
                     eta = progress[3].strip().replace('ETA', '').strip()
-                    text = f'**Download**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
+                    text = f'**Downloaded**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
 
                     if text != last_text:
                         await status.edit_text(text)
+                        await asyncio.sleep(3)
                         last_text = text
-
-                    await asyncio.sleep(3)
+                        
         if process is not None:
           process.wait()
 
@@ -181,11 +181,9 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
 
                 if text != last_text:
                     await status.edit_text(text)
+                    await asyncio.sleep(3)
                     last_text = text
-
-                await asyncio.sleep(3)
-
-
+                    
         if process is not None:  # Ensure process is still running before waiting
             process.wait()
 
@@ -393,14 +391,13 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
               progress = datam[0].replace("Transferred:", "").strip().split(",")
               dwdata = progress[0].strip().split('/')
               eta = progress[3].strip().replace('ETA', '').strip()
-              text =f'**Upload**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
+              text =f'**Uploaded**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
 
               if text != last_text:
                 await status.edit_text(text)
-                last_text = text
-
                 await asyncio.sleep(3)
-
+                last_text = text
+                
         if process is not None:
           process.wait()
 
