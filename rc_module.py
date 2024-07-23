@@ -77,7 +77,7 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
           process.wait()
 
           if process.returncode == 0:
-            await status.edit_text("Download completed successfully.")
+            await status.delete()
           else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
         else:
@@ -179,7 +179,7 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
             process.wait()
 
             if process.returncode == 0:
-              await status.edit_text(f"Merge completed successfully `{output_file_path}`")
+              await status.delete()
             else:
               await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
         else:
@@ -394,7 +394,7 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
           process.wait()
 
           if process.returncode == 0:
-            await status.edit_text("Upload completed successfully.")
+            await status.delete()
           else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
         else:
