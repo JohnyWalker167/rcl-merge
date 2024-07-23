@@ -57,6 +57,7 @@ async def clear_command(client, message):
 
 @app.on_message(filters.command("download"))
 async def download_command(client, message):
+    user_id = message.from_user.id
     # Ask for the rclone remote name
     await message.reply_text("Enter the rclone remote name:")
     remote_name = (await app.listen(message.chat.id)).text
@@ -68,10 +69,13 @@ async def download_command(client, message):
     status = await message.reply_text("Downloading..")
 
     # Download from rclone cloud
-    status = await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
+    await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
+    await app.send_message(user_id, text="Download Completed.") 
+    
 
 @app.on_message(filters.command("merge"))
 async def merge_command(client, message):
+    user_id = message.from_user.id
     # Ask for the local path containing video files to merge
     await message.reply_text("Enter the local path containing video files to merge:")
     merge_local_path = (await app.listen(message.chat.id)).text
@@ -90,6 +94,8 @@ async def merge_command(client, message):
 
     # Merge videos using ffmpeg and get the merged file path
     await merge(status, merge_local_path, output_filename, custom_title, audio_select)
+
+    await app.send_message(user_id, text="Merge Completed.") 
 
 @app.on_message(filters.command("changeindex"))
 async def changeindex_command(client, message):
@@ -134,6 +140,7 @@ async def encode_command(client, message):
 
 @app.on_message(filters.command("upload"))
 async def upload_command(client, message):
+    user_id = message.from_user.id
     # Ask for the local path of the merged video file
     await message.reply_text("Enter the local path of the merged video file:")
     local_merged_video = (await app.listen(message.chat.id)).text
@@ -150,7 +157,8 @@ async def upload_command(client, message):
 
     # Upload merged video to rclone cloud
     await upload(status, local_merged_video, remote_upload_path, remote_upload_name, rclone_config_path=RCLONE_CONFIG_PATH)
-
+    await app.send_message(user_id, text="Upload Completed.") 
+    
 @app.on_message(filters.command("log"))
 async def log_command(client, message):
     user_id = message.from_user.id
