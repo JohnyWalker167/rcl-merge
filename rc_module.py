@@ -53,7 +53,7 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
     ]
 
     last_text = None
-
+    downloaded_path = None
     try:
         # Run the rclone command
         process = subprocess.Popen(rclone_download_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -77,6 +77,16 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
           process.wait()
 
           if process.returncode == 0:
+              # Determine the downloaded path
+              if os.path.isdir(local_path):
+                  downloaded_path = local_path
+              else:
+                  downloaded_files = os.listdir(local_path)
+                  if len(downloaded_files) == 1:
+                      downloaded_path = os.path.join(local_path, downloaded_files[0])
+                  else:
+                      downloaded_path = local_path  
+                  
             await status.delete()
           else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
@@ -86,6 +96,7 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
         logger.error(f"Error: {e}")
     finally:
       process = None
+    return downloaded_path
 
 async def merge(status, local_path, output_filename, custom_title, audio_select):
     """
