@@ -69,8 +69,8 @@ async def download_command(client, message):
     status = await message.reply_text("Downloading..")
 
     # Download from rclone cloud
-    await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
-    await app.send_message(user_id, text="Download Completed.") 
+    downloaded_path = await download(status, remote_path, DEFAULT_LOCAL_PATH, remote_name, rclone_config_path=RCLONE_CONFIG_PATH)
+    await app.send_message(user_id, text=f"Download Completed {downloaded_path}") 
     
 
 @app.on_message(filters.command("merge"))
