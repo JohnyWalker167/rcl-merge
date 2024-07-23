@@ -86,8 +86,7 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
                       downloaded_path = os.path.join(local_path, downloaded_files[0])
                   else:
                       downloaded_path = local_path  
-                  
-            await status.delete()
+              await status.delete()
           else:
             await status.edit_text(f"rclone command failed with return code {process.returncode}")
         else:
