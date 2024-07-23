@@ -66,7 +66,7 @@ async def download(status, remote_path, local_path, remote_name='remote', rclone
                     progress = datam[0].replace("Transferred:", "").strip().split(",")
                     dwdata = progress[0].strip().split('/')
                     eta = progress[3].strip().replace('ETA', '').strip()
-                    text = f'**Downloaded**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
+                    text = f'**Downloading**:\n {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}'
 
                     if text != last_text:
                         await status.edit_text(text)
@@ -175,7 +175,7 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
                 bitrate = bitrate_match.group(1)
                 speed_str = speed_match.group(1)
 
-                text = (f'**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
+                text = (f'**Merging**:\n**Frame**: {frame} | **FPS**: {fps} | **Size**: {size:.2f} MB | '
                         f'**Time**: {time_str} | **Bitrate**: {bitrate} | **Speed**: {speed_str}')
 
                 if text != last_text:
@@ -390,7 +390,7 @@ async def upload(status, local_file, remote_path, remote_name='remote', rclone_c
               progress = datam[0].replace("Transferred:", "").strip().split(",")
               dwdata = progress[0].strip().split('/')
               eta = progress[3].strip().replace('ETA', '').strip()
-              text =f'**Uploaded**: {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
+              text =f'**Uploaded**:\n {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress[2]} | **ETA**: {eta}"'
 
               if text != last_text:
                 await status.edit_text(text)
