@@ -200,6 +200,7 @@ async def merge(status, local_path, output_filename, custom_title, audio_select)
         # Remove the input.txt file after merging
         os.remove(input_txt_path)
         process = None  # Clear the process reference in the end
+        return output_file_path
         
 
 async def encode(status, local_path, input_file_name, output_file_name, custom_title):
