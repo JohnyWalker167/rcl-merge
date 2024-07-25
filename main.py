@@ -95,7 +95,7 @@ async def merge_command(client, message):
     # Merge videos using ffmpeg and get the merged file path
     merge_path = await merge(status, merge_local_path, output_filename, custom_title, audio_select)
 
-    await app.send_message(user_id, text=f"Merge Completed {merge_path}") 
+    await app.send_message(user_id, text=f"Merge Completed `{merge_path`}") 
 
 @app.on_message(filters.command("changeindex"))
 async def changeindex_command(client, message):
