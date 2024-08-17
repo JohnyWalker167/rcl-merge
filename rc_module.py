@@ -363,33 +363,33 @@ async def softmux(status, local_path, input_file_name, output_file_name, custom_
     file_title = await remove_unwanted(output_file_name)
 
     ffmpeg_command = [
-    'ffmpeg',
-    '-i', input_file_path,
-    '-i', subtitle_file_path,  # Include the SRT subtitle file
-    '-metadata', f'title={file_title}',
-    '-metadata:s:v:0', f'title={custom_title}',
-    '-metadata:s:a:0', f'title={custom_title}',
-    '-metadata:s:s:0', f'title={custom_title}',
-    '-c:v', 'copy',  # Copy video stream
-    '-c:a', 'copy',  # Copy audio stream
-    '-c:s', 'mov_text',  # Use mov_text codec for the subtitle
-    '-map', '0:v',  # Map the video stream
-    '-map', f'{audio_select}',  # Map the selected audio stream
-    '-map', '0:s',  # Map the original subtitle stream (if any)
-    '-map', '1',  # Map the new subtitle file
-    output_file_path
+        'ffmpeg',
+        '-i', input_file_path,
+        '-i', subtitle_file_path,  # Include the SRT subtitle file
+        '-metadata', f'title={file_title}',
+        '-metadata:s:v:0', f'title={custom_title}',
+        '-metadata:s:a:0', f'title={custom_title}',
+        '-metadata:s:s:0', f'title={custom_title}',
+        '-c:v', 'copy',  # Copy video stream
+        '-c:a', 'copy',  # Copy audio stream
+        '-c:s', 'mov_text',  # Use mov_text codec for the subtitle
+        '-map', '0:v',  # Map the video stream
+        '-map', f'{audio_select}',  # Map the selected audio stream
+        '-map', '0:s',  # Map the original subtitle stream (if any)
+        '-map', '1',  # Map the new subtitle file
+        output_file_path
     ]
 
     last_text = None
 
     try:
         # Run the ffmpeg command and capture the output
-        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        
-        # Log output in real time
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Log output in real-time
         for line in process.stdout:
-            if process is None: # Check if the process has been cancelled
-              break
+            if process is None:  # Check if the process has been cancelled
+                break
             line = line.strip()
 
             # Parse the ffmpeg progress output
@@ -417,23 +417,26 @@ async def softmux(status, local_path, input_file_name, output_file_name, custom_
 
                 await asyncio.sleep(3)
 
+        # Capture any errors from stderr
+        stderr_output = process.stderr.read()
 
         if process is not None:  # Ensure process is still running before waiting
             process.wait()
 
             if process.returncode == 0:
-              await status.edit_text(f"Change Index successfully `{output_file_path}`")
+                await status.edit_text(f"Change Index successfully `{output_file_path}`")
             else:
-              await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
+                error_message = f"ffmpeg command failed with return code {process.returncode}. Error details: {stderr_output}"
+                await status.edit_text(error_message)
         else:
-           await status.delete
-        
+            await status.delete()
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         return None
     finally:
         process = None  # Clear the process reference in the end
-
+        
 async def upload(status, local_file, remote_path, remote_name='remote', rclone_config_path=None):
     """
     Upload a local file to a specified path on a cloud storage using rclone.
