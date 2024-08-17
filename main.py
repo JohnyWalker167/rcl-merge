@@ -112,12 +112,9 @@ async def changeindex_command(client, message):
     await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
     audio_select = (await app.listen(message.chat.id)).text
 
-    await message.reply_text("Enter the sub arg for the merged video file (e.g., `0:s` # Copy all sub streams, `0:s:1` # Copy the second sub stream (add more if needed)):")
-    sub_select = (await app.listen(message.chat.id)).text
-
     status = await message.reply_text(f"changing...")
 
-    await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, sub_select)
+    await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select)
 
 
 @app.on_message(filters.command("encode"))
