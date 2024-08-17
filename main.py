@@ -3,7 +3,7 @@ from shutil import rmtree
 import time
 from pyrogram import filters, Client
 from pyromod import listen
-from rc_module import download, merge, upload, logger, LOG_FILE_NAME, cancel_download, changeindex, encode
+from rc_module import download, merge, upload, logger, LOG_FILE_NAME, cancel_download, changeindex, encode, softmux
 from dotenv import load_dotenv
 from pyrogram.errors import FloodWait
 
@@ -116,6 +116,27 @@ async def changeindex_command(client, message):
 
     await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select)
 
+@app.on_message(filters.command("softmux"))
+async def softmux_command(client, message):
+
+    await message.reply_text("Enter the file_name of the video (e.g., encode.mp4)")
+    input_file_name = (await app.listen(message.chat.id)).text
+
+    await message.reply_text("Enter the file_name of the video (e.g., merged_output.mp4)")
+    output_file_name = (await app.listen(message.chat.id)).text
+
+    await message.reply_text("Enter the file_name of the subtitle (e.g., `2_English.srt`)")
+    subtitle_file_name = (await app.listen(message.chat.id)).text
+
+    await message.reply_text("Enter the title for the merged video file (e.g., `@hevcripsofficial`):")
+    custom_title = (await app.listen(message.chat.id)).text
+
+    await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
+    audio_select = (await app.listen(message.chat.id)).text
+
+    status = await message.reply_text(f"changing...")
+
+    await softmux(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, subtitle_file_name)
 
 @app.on_message(filters.command("encode"))
 async def encode_command(client, message):
