@@ -281,7 +281,7 @@ async def encode(status, local_path, input_file_name, output_file_name, custom_t
         logger.error(f"Error: {e}")
         return None
 
-async def changeindex(status, local_path, input_file_name, output_file_name, custom_title, audio_select, sub_select):
+async def changeindex(status, local_path, input_file_name, output_file_name, custom_title, audio_select):
    
     input_file_path = os.path.join(local_path, input_file_name)
     output_file_path = os.path.join(local_path, output_file_name)
@@ -292,10 +292,12 @@ async def changeindex(status, local_path, input_file_name, output_file_name, cus
         '-i', input_file_path,
         '-metadata', f'title={file_title}',
         '-metadata:s:v:0', f'title={custom_title}',
+        '-metadata:s:a:0', f'title={custom_title}',
+        '-metadata:s:s:0', f'title={custom_title}',
         '-c', 'copy',
         '-map', '0:v',  # Copy video stream
-        '-map', f'{audio_select}',
-        '-map', f'{sub_select}',
+        '-map', f'{audio_select}', # Copy audio stream
+        '-map', '0:s', # Copy sub stream
         output_file_path
     ]
 
