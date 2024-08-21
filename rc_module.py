@@ -354,6 +354,7 @@ async def changeindex(status, local_path, input_file_name, output_file_name, cus
         return None
     finally:
         process = None  # Clear the process reference in the end
+        return output_file_path
 
 async def softmux(status, local_path, input_file_name, output_file_name, custom_title, audio_select, subtitle_file_name):
    
@@ -432,6 +433,7 @@ async def softmux(status, local_path, input_file_name, output_file_name, custom_
         return None
     finally:
         process = None  # Clear the process reference in the end
+        return output_file_path
 
 async def upload(status, local_file, remote_path, remote_name='remote', rclone_config_path=None):
     """
