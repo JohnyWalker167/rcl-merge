@@ -99,7 +99,7 @@ async def merge_command(client, message):
 
 @app.on_message(filters.command("changeindex"))
 async def changeindex_command(client, message):
-
+    user_id = message.from_user.id
     await message.reply_text("Enter the file_name of the video (e.g., encode.mp4)")
     input_file_name = (await app.listen(message.chat.id)).text
 
@@ -114,11 +114,12 @@ async def changeindex_command(client, message):
 
     status = await message.reply_text(f"changing...")
 
-    await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select)
+    change_index_path = await changeindex(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select)
+    await app.send_message(user_id, text=f"Index Change Completed `{change_index_path}`") 
 
 @app.on_message(filters.command("softmux"))
 async def softmux_command(client, message):
-
+    user_id = message.from_user.id
     await message.reply_text("Enter the file_name of the video (e.g., encode.mp4)")
     input_file_name = (await app.listen(message.chat.id)).text
 
@@ -136,7 +137,8 @@ async def softmux_command(client, message):
 
     status = await message.reply_text(f"changing...")
 
-    await softmux(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, subtitle_file_name)
+    softmux_path = await softmux(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, subtitle_file_name)
+    await app.send_message(user_id, text=f"Softmux Completed `{softmux_path}`") 
 
 @app.on_message(filters.command("encode"))
 async def encode_command(client, message):
