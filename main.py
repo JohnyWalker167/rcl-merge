@@ -140,24 +140,6 @@ async def softmux_command(client, message):
     softmux_path = await softmux(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title, audio_select, subtitle_file_name)
     await app.send_message(user_id, text=f"Softmux Completed `{softmux_path}`") 
 
-@app.on_message(filters.command("encode"))
-async def encode_command(client, message):
-    # Ask for the file_name of video
-    await message.reply_text("Enter the file_name of the video (e.g., encode.mp4)")
-    input_file_name = (await app.listen(message.chat.id)).text
-
-    # Ask for the custom file_name for the encode output
-    await message.reply_text("Enter the file_name of the video (e.g., merged_output.mp4)")
-    output_file_name = (await app.listen(message.chat.id)).text
-
-    # Ask for the custom title for the video
-    await message.reply_text("Enter the custom title for the encoded video:")
-    custom_title = (await app.listen(message.chat.id)).text
-
-    status = await message.reply_text("Encoding...") 
-
-    await encode(status, DEFAULT_LOCAL_PATH, input_file_name, output_file_name, custom_title)
-
 @app.on_message(filters.command("upload"))
 async def upload_command(client, message):
     user_id = message.from_user.id
