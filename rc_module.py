@@ -34,21 +34,43 @@ async def execute_command(command, status, progress_label):
     last_text = None
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        async for line in iter(process.stdout.readline, ''):
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+
             line = line.strip()
-            progress = refindall(r"Transferred:.*ETA.*", line)
-            if progress:
-                progress_data = progress[0].replace("Transferred:", "").strip().split(",")
-                dwdata = progress_data[0].strip().split('/')
-                eta = progress_data[3].strip().replace('ETA', '').strip()
-                text = f'**{progress_label}**:\n {dwdata[0].strip()} of {dwdata[1].strip()}\n**Speed**: {progress_data[2]} | **ETA**: {eta}'
-                
-                if text != last_text:
-                    await status.edit_text(text)
-                    await asyncio.sleep(3)
-                    last_text = text
-        
-        process.wait()
+
+            # Parse the ffmpeg progress output
+            frame_match = re.search(r'frame=\s*(\d+)', line)
+            fps_match = re.search(r'fps=\s*(\d+\.?\d*)', line)
+            size_match = re.search(r'size=\s*([\d\.]+(?:kB|MB|GB))', line)
+            time_match = re.search(r'time=(\d{2}:\d{2}:\d{2}\.\d{2})', line)
+            bitrate_match = re.search(r'bitrate=\s*([\d\.]+kbits/s)', line)
+            speed_match = re.search(r'speed=\s*([\d\.]+x)', line)
+
+            # Extract matched groups
+            frame = frame_match.group(1) if frame_match else 'N/A'
+            fps = fps_match.group(1) if fps_match else 'N/A'
+            size = size_match.group(1) if size_match else 'N/A'
+            time = time_match.group(1) if time_match else 'N/A'
+            bitrate = bitrate_match.group(1) if bitrate_match else 'N/A'
+            speed = speed_match.group(1) if speed_match else 'N/A'
+
+            text = (f'**{progress_label}**:\n'
+                    f'**Frame**: {frame}\n'
+                    f'**FPS**: {fps}\n'
+                    f'**Size**: {size}\n'
+                    f'**Time**: {time}\n'
+                    f'**Bitrate**: {bitrate}\n'
+                    f'**Speed**: {speed}')
+
+            if text != last_text:
+                await status.edit_text(text)
+                await asyncio.sleep(3)
+                last_text = text
+
+        await process.wait()
         if process.returncode != 0:
             await status.edit_text(f"Command failed with return code {process.returncode}")
         else:
