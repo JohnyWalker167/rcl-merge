@@ -343,7 +343,7 @@ async def changeindex(status, local_path, input_file_name, output_file_name, cus
             process.wait()
 
             if process.returncode == 0:
-              await status.edit_text(f"Change Index successfully `{output_file_path}`")
+              await status.delete()
             else:
               await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
         else:
@@ -422,7 +422,7 @@ async def softmux(status, local_path, input_file_name, output_file_name, custom_
             process.wait()
 
             if process.returncode == 0:
-              await status.edit_text(f"Change Index successfully `{output_file_path}`")
+              await status.delete()
             else:
               await status.edit_text(f"ffmpeg command failed with return code {process.returncode}")
         else:
