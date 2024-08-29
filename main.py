@@ -1,8 +1,11 @@
 import os
 from shutil import rmtree
 import time
+from datetime import datetime
+import subprocess
 from pyrogram import filters, Client
 from pyromod import listen
+from urllib.parse import urlparse, parse_qs, unquote
 from rc_module import download, merge, upload, logger, LOG_FILE_NAME, cancel_download, changeindex, softmux
 from dotenv import load_dotenv
 from pyrogram.errors import FloodWait
@@ -22,6 +25,21 @@ bot_token = os.environ.get("BOT_TOKEN", "")  # Replace "" with your actual Bot T
 
 app = Client("my_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
+# Initialize start time
+BotTimes = type("BotTimes", (object,), {"task_start": datetime.now()})
+
+def extract_filename(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    
+    # Assume the file parameter contains the filename
+    if 'file' in query_params:
+        filename = os.path.basename(unquote(query_params['file'][0]))
+    else:
+        filename = 'downloaded_file'  # Default if no filename is found
+
+    print(f"Extracted filename: {filename}")
+    return filename
 
 async def main():
     await app.run()
@@ -37,17 +55,6 @@ async def delete_all(dir):
 @app.on_message(filters.command("start"))
 async def start_command(client, message):
     await message.reply_text("Welcome! This bot can perform rclone operations and video merging. Use /help for commands.")
-
-@app.on_message(filters.command("help"))
-async def help_command(client, message):
-    help_text = (
-        "Available commands:\n"
-        "/download - Download files from rclone cloud storage\n"
-        "/merge - Merge video files\n"
-        "/upload - Upload merged video to rclone cloud storage\n"
-        "/help - Show this help message"
-    )
-    await message.reply_text(help_text)
 
 @app.on_message(filters.command("clear"))
 async def clear_command(client, message):
@@ -129,7 +136,7 @@ async def softmux_command(client, message):
     await message.reply_text("Enter the file_name of the subtitle (e.g., `2_English.srt`)")
     subtitle_file_name = (await app.listen(message.chat.id)).text
 
-    await message.reply_text("Enter the title for the merged video file (e.g., `@hevcripsofficial`):")
+    await message.reply_text("Enter the title for the merged video file (e.g., `REPACKED BY @thetgflix`):")
     custom_title = (await app.listen(message.chat.id)).text
 
     await message.reply_text("Enter the audio arg for the merged video file (e.g., `0:a` # Copy all audio streams, `0:a:1` # Copy the second audio stream (add more if needed)):")
@@ -170,6 +177,34 @@ async def log_command(client, message):
         await app.send_document(user_id, document=LOG_FILE_NAME, caption="Bot Log File")
     except Exception as e:
         await app.send_message(user_id, f"Failed to send log file. Error: {str(e)}")
+
+@app.on_message(filters.text)
+async def handle_download(client, message):
+    if message.text.startswith("http://") or message.text.startswith("https://"):
+        download_url = message.text
+        filename = extract_filename(download_url)
+
+        progress_msg = await message.reply_text("Starting download...")
+
+        command = [
+            "aria2c",
+            "--continue=true",
+            "--max-connection-per-server=4",
+            "--split=4",
+            "--summary-interval=1",
+            "--console-log-level=notice",
+            "--dir=" + DEFAULT_LOCAL_PATH,  
+            "--out=" + filename,
+            download_url
+        ]
+
+        BotTimes.task_start = datetime.now()
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        process.communicate()  # Wait for the process to complete
+
+        await progress_msg.edit_text("Download complete!")
+
 
 @app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
