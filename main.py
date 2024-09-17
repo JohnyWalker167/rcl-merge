@@ -203,8 +203,7 @@ async def handle_download(client, message):
 
         process.communicate()  # Wait for the process to complete
 
-        await progress_msg.edit_text(f'Downloaded ✅ `{filename}`')
-
+        await progress_msg.edit_text(f'Downloaded ✅ `{filename}` at {datetime.now().strftime("%H:%M:%S")}')
 
 @app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
