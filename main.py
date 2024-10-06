@@ -184,8 +184,6 @@ async def handle_download(client, message):
         download_url = message.text
         filename = extract_filename(download_url)
 
-        progress_msg = await message.reply_text("Starting download...")
-
         command = [
             "aria2c",
             "--continue=true",
@@ -203,7 +201,7 @@ async def handle_download(client, message):
 
         process.communicate()  # Wait for the process to complete
 
-    await progress_msg.edit_text(f'Downloaded ✅ `{filename}` at {datetime.now().strftime("%H:%M:%S")}')
+        await message.reply_text(f'Downloaded ✅ `{filename}` at {datetime.now().strftime("%H:%M:%S")}')
 
 @app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
